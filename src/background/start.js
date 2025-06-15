@@ -2,6 +2,7 @@ import {
     filterByTitleOrUrl,
 } from '../common/utils.js';
 import llmClients from './llm.js';
+import mcpServer from './mcp.js';
 
 function request(url, onReady, headers, data, onException) {
     headers = headers || {};
@@ -201,6 +202,9 @@ function start(browser) {
     var self = {};
 
     const isMV3 = chrome.runtime.getManifest().manifest_version === 3;
+    
+    // Initialize MCP Server
+    mcpServer.init();
 
     var tabHistory = [],
         tabHistoryIndex = 0,

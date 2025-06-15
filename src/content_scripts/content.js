@@ -22,6 +22,7 @@ import {
 import createFront from './front.js';
 import createAPI from './common/api.js';
 import createDefaultMappings from './common/default.js';
+import createMCPHandler from './mcp_handler.js';
 
 import KeyboardUtils from './common/keyboardUtils';
 
@@ -148,6 +149,7 @@ function _initModules() {
     const hints = createHints(insert, normal, clipboard);
     const visual = createVisual(clipboard, hints);
     const front = createFront(insert, normal, hints, visual, _browser);
+    const mcpHandler = createMCPHandler(normal, hints, visual, front, clipboard);
 
     const api = createAPI(clipboard, insert, normal, hints, visual, front, _browser);
     createDefaultMappings(api, clipboard, insert, normal, hints, visual, front, _browser);

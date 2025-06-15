@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MCP Test - Surfingkeys</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .connected { background: #d4edda; color: #155724; }
+        .disconnected { background: #f8d7da; color: #721c24; }
+        .command {
+            background: #f0f0f0;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .response {
+            background: #e7f3ff;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .test-section {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Surfingkeys MCP Test</h1>
+    
+    <div class="status disconnected" id="status">
+        Status: Disconnected
+    </div>
+    
+    <div class="test-section">
+        <h2>Connection Test</h2>
+        <button onclick="connectMCP()">Connect to MCP Server</button>
+        <button onclick="disconnectMCP()">Disconnect</button>
+    </div>
+    
+    <div class="test-section">
+        <h2>Navigation Commands</h2>
+        <button onclick="testCommand('surfingkeys.navigate', {url: 'https://www.google.com', newTab: true})">
+            Navigate to Google (New Tab)
+        </button>
+        <button onclick="testCommand('surfingkeys.tabs.list', {})">
+            List All Tabs
+        </button>
+        <button onclick="testCommand('surfingkeys.tabs.switch', {direction: 'next'})">
+            Next Tab
+        </button>
+    </div>
+    
+    <div class="test-section">
+        <h2>Hints Commands</h2>
+        <button onclick="testCommand('surfingkeys.hints.show', {selector: 'a', action: 'click'})">
+            Show Link Hints
+        </button>
+        <button onclick="testCommand('surfingkeys.hints.click', {selector: 'button', index: 0})">
+            Click First Button
+        </button>
+    </div>
+    
+    <div class="test-section">
+        <h2>Search Commands</h2>
+        <button onclick="testCommand('surfingkeys.search', {query: 'Surfingkeys MCP', engine: 'google'})">
+            Search "Surfingkeys MCP"
+        </button>
+        <button onclick="testCommand('surfingkeys.find', {text: 'test', caseSensitive: false})">
+            Find "test" in Page
+        </button>
+    </div>
+    
+    <div class="test-section">
+        <h2>Clipboard Commands</h2>
+        <button onclick="testCommand('surfingkeys.clipboard.write', {text: 'Hello from MCP!'})">
+            Write to Clipboard
+        </button>
+        <button onclick="testCommand('surfingkeys.clipboard.read', {})">
+            Read Clipboard
+        </button>
+    </div>
+    
+    <div class="test-section">
+        <h2>Other Commands</h2>
+        <button onclick="testCommand('surfingkeys.screenshot', {format: 'png'})">
+            Take Screenshot
+        </button>
+        <button onclick="testCommand('surfingkeys.scroll', {direction: 'down'})">
+            Scroll Down
+        </button>
+        <button onclick="testCommand('surfingkeys.omnibar', {type: 'Commands'})">
+            Open Command Omnibar
+        </button>
+    </div>
+    
+    <div class="test-section">
+        <h2>Command Log</h2>
+        <div id="log"></div>
+    </div>
+    
+    <script>
+        let ws = null;
+        let messageId = 0;
+        
+        function updateStatus(connected) {
+            const status = document.getElementById('status');
+            if (connected) {
+                status.className = 'status connected';
+                status.textContent = 'Status: Connected';
+            } else {
+                status.className = 'status disconnected';
+                status.textContent = 'Status: Disconnected';
+            }
+        }
+        
+        function log(message, type = 'command') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = type;
+            entry.textContent = typeof message === 'object' ? JSON.stringify(message, null, 2) : message;
+            logDiv.insertBefore(entry, logDiv.firstChild);
+        }
+        
+        function connectMCP() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                log('Already connected');
+                return;
+            }
+            
+            try {
+                ws = new WebSocket('ws://localhost:8765');
+                
+                ws.onopen = () => {
+                    updateStatus(true);
+                    log('Connected to MCP server');
+                    ws.send(JSON.stringify({
+                        type: 'connected',
+                        from: 'test-client'
+                    }));
+                };
+                
+                ws.onmessage = (event) => {
+                    const message = JSON.parse(event.data);
+                    log(message, 'response');
+                };
+                
+                ws.onclose = () => {
+                    updateStatus(false);
+                    log('Disconnected from MCP server');
+                };
+                
+                ws.onerror = (error) => {
+                    log('WebSocket error: ' + error, 'response');
+                };
+            } catch (error) {
+                log('Failed to connect: ' + error, 'response');
+            }
+        }
+        
+        function disconnectMCP() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+        
+        function testCommand(command, params) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('Not connected. Please connect first.', 'response');
+                return;
+            }
+            
+            const message = {
+                id: `test-${++messageId}`,
+                command: command,
+                params: params
+            };
+            
+            log(`Sending: ${command}`, 'command');
+            log(message, 'command');
+            
+            ws.send(JSON.stringify(message));
+        }
+        
+        // Some test elements
+        const testLinks = document.createElement('div');
+        testLinks.innerHTML = `
+            <h3>Test Elements</h3>
+            <a href="https://example.com">Example Link</a> |
+            <a href="https://github.com">GitHub</a> |
+            <a href="https://google.com">Google</a>
+            <br><br>
+            <input type="text" placeholder="Test input field">
+            <button>Test Button</button>
+        `;
+        document.body.appendChild(testLinks);
+    </script>
+</body>
+</html>
